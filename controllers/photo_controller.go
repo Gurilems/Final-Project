@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"final-project/database"
 	"final-project/helpers"
 	"final-project/models"
 	"fmt"
@@ -14,8 +13,15 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreatePhoto(ctx *gin.Context) {
-	db := database.GetDB()
+type PhotoController struct {
+	db *gorm.DB
+}
+
+func NewPhotoController(db *gorm.DB) *PhotoController {
+	return &PhotoController{db: db}
+}
+
+func (pc *PhotoController) CreatePhoto(ctx *gin.Context) {
 	photo := models.Photo{}
 
 	if err := ctx.ShouldBindJSON(&photo); err != nil {
@@ -24,13 +30,13 @@ func CreatePhoto(ctx *gin.Context) {
 	}
 
 	userData := ctx.MustGet("userData").(jwt.MapClaims)
-	userDataId := userData["id"].(float64)
+	userDataID := uint(userData["id"].(float64))
 
 	photo.Created_at = time.Now()
 	photo.Updated_at = time.Now()
-	photo.UserID = uint(userDataId)
+	photo.UserID = userDataID
 
-	err := db.Create(&photo).Error
+	err := pc.db.Create(&photo).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -55,15 +61,14 @@ func CreatePhoto(ctx *gin.Context) {
 	})
 }
 
-func GetAllPhotos(ctx *gin.Context) {
-	db := database.GetDB()
+func (pc *PhotoController) GetAllPhotos(ctx *gin.Context) {
 	userData := ctx.MustGet("userData").(jwt.MapClaims)
-	userDataId := userData["id"].(float64)
-	fmt.Println("iniuserid", userDataId)
+	userDataID := uint(userData["id"].(float64))
+
 	photos := []models.Photo{}
-	err := db.Preload("User", func(tx *gorm.DB) *gorm.DB {
+	err := pc.db.Preload("User", func(tx *gorm.DB) *gorm.DB {
 		return tx.Select("ID", "email", "username", "created_at", "updated_at")
-	}).Where("user_id = ?", uint(userDataId)).Find(&photos).Error
+	}).Where("user_id = ?", userDataID).Find(&photos).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -80,8 +85,7 @@ func GetAllPhotos(ctx *gin.Context) {
 	})
 }
 
-func UpdatePhoto(ctx *gin.Context) {
-	db := database.GetDB()
+func (pc *PhotoController) UpdatePhoto(ctx *gin.Context) {
 	photo := models.Photo{}
 	contentType := helpers.GetContentType(ctx)
 	if contentType == "application/json" {
@@ -95,7 +99,7 @@ func UpdatePhoto(ctx *gin.Context) {
 	photo.Updated_at = time.Now()
 
 	fmt.Printf("Value Update: %+v\n", photo)
-	err := db.Model(&photo).Where("id = ?", photo.ID).Updates(&photo).Error
+	err := pc.db.Model(&photo).Where("id = ?", photo.ID).Updates(&photo).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -108,7 +112,7 @@ func UpdatePhoto(ctx *gin.Context) {
 	}
 
 	updatedPhoto := models.Photo{}
-	_ = db.First(&updatedPhoto, "id = ?", photo.ID).Error
+	_ = pc.db.First(&updatedPhoto, "id = ?", photo.ID).Error
 
 	ctx.JSON(http.StatusCreated, gin.H{
 		"status": http.StatusOK,
@@ -123,14 +127,13 @@ func UpdatePhoto(ctx *gin.Context) {
 	})
 }
 
-func DeletePhoto(ctx *gin.Context) {
-	db := database.GetDB()
+func (pc *PhotoController) DeletePhoto(ctx *gin.Context) {
 	photo := models.Photo{}
 	temp, _ := strconv.Atoi(ctx.Param("photoId"))
 
 	photo.ID = uint(temp)
 
-	err := db.Where("id= ?", photo.ID).Delete(&photo).Error
+	err := pc.db.Where("id= ?", photo.ID).Delete(&photo).Error
 
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{

@@ -13,7 +13,7 @@ const (
 	host     = "localhost"
 	user     = "postgres"
 	password = "root"
-	dbPort   = "8080"
+	dbPort   = "5432"
 	dbName   = "final-project"
 )
 

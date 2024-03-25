@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"final-project/database"
 	"final-project/helpers"
 	"final-project/models"
 	"fmt"
@@ -11,10 +10,18 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-func UserLogin(ctx *gin.Context) {
-	db := database.GetDB()
+type UserController struct {
+	db *gorm.DB
+}
+
+func NewUserController(db *gorm.DB) *UserController {
+	return &UserController{db: db}
+}
+
+func (uc *UserController) UserLogin(ctx *gin.Context) {
 	contentType := helpers.GetContentType(ctx)
 
 	user := models.User{}
@@ -28,7 +35,7 @@ func UserLogin(ctx *gin.Context) {
 
 	password = user.Password
 
-	err := db.Debug().Where("email = ?", user.Email).Take(&user).Error
+	err := uc.db.Debug().Where("email = ?", user.Email).Take(&user).Error
 
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
@@ -63,8 +70,7 @@ func UserLogin(ctx *gin.Context) {
 
 }
 
-func UpdateUser(ctx *gin.Context) {
-	db := database.GetDB()
+func (uc *UserController) UpdateUser(ctx *gin.Context) {
 	user := models.User{}
 	contentType := helpers.GetContentType(ctx)
 	if contentType == "application/json" {
@@ -78,7 +84,7 @@ func UpdateUser(ctx *gin.Context) {
 	user.Updated_at = time.Now()
 
 	fmt.Printf("Value Update: %+v\n", user)
-	err := db.Model(&user).Where("id = ?", user.ID).Updates(&user).Error
+	err := uc.db.Model(&user).Where("id = ?", user.ID).Updates(&user).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -90,9 +96,9 @@ func UpdateUser(ctx *gin.Context) {
 		return
 	}
 	updatedUser := models.User{}
-	_ = db.First(&updatedUser, "id = ?", user.ID).Error
+	_ = uc.db.First(&updatedUser, "id = ?", user.ID).Error
 
-	ctx.JSON(http.StatusCreated, gin.H{
+	ctx.JSON(http.StatusOK, gin.H{
 		"status": http.StatusOK,
 		"data": gin.H{
 			"id":         updatedUser.ID,
@@ -104,8 +110,7 @@ func UpdateUser(ctx *gin.Context) {
 	})
 }
 
-func CreateUser(ctx *gin.Context) {
-	db := database.GetDB()
+func (uc *UserController) CreateUser(ctx *gin.Context) {
 	user := models.User{}
 
 	contentType := helpers.GetContentType(ctx)
@@ -119,7 +124,7 @@ func CreateUser(ctx *gin.Context) {
 	user.Created_at = time.Now()
 	user.Updated_at = time.Now()
 
-	err := db.Debug().Create(&user).Error
+	err := uc.db.Debug().Create(&user).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -143,14 +148,13 @@ func CreateUser(ctx *gin.Context) {
 
 }
 
-func DeleteUser(ctx *gin.Context) {
-	db := database.GetDB()
+func (uc *UserController) DeleteUser(ctx *gin.Context) {
 	UserData := ctx.MustGet("userData").(jwt.MapClaims)
 	userIdFromJwt := UserData["id"].(float64)
 	fmt.Println(userIdFromJwt)
 	user := models.User{}
 
-	err := db.Where("id= ?", userIdFromJwt).Delete(&user).Error
+	err := uc.db.Where("id= ?", userIdFromJwt).Delete(&user).Error
 
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{

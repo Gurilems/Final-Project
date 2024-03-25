@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"final-project/database"
 	"final-project/helpers"
 	"final-project/models"
 	"fmt"
@@ -14,9 +13,17 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreateComment(ctx *gin.Context) {
-	db := database.GetDB()
+type CommentController struct {
+	db *gorm.DB
+}
+
+func NewCommentController(db *gorm.DB) *CommentController {
+	return &CommentController{db: db}
+}
+
+func (c *CommentController) CreateComment(ctx *gin.Context) {
 	comment := models.Comment{}
+
 	contentType := helpers.GetContentType(ctx)
 	if contentType == "application/json" {
 		ctx.ShouldBindJSON(&comment)
@@ -25,13 +32,13 @@ func CreateComment(ctx *gin.Context) {
 	}
 
 	userData := ctx.MustGet("userData").(jwt.MapClaims)
-	userDataId := userData["id"].(float64)
+	userDataID := uint(userData["id"].(float64))
 
 	comment.Created_at = time.Now()
 	comment.Updated_at = time.Now()
-	comment.UserID = uint(userDataId)
+	comment.UserID = userDataID
 
-	err := db.Create(&comment).Error
+	err := c.db.Create(&comment).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -55,16 +62,16 @@ func CreateComment(ctx *gin.Context) {
 	})
 }
 
-func GetAllComments(ctx *gin.Context) {
-	db := database.GetDB()
+func (c *CommentController) GetAllComments(ctx *gin.Context) {
 	userData := ctx.MustGet("userData").(jwt.MapClaims)
-	userDataId := userData["id"].(float64)
+	userDataID := uint(userData["id"].(float64))
+
 	comments := []models.Comment{}
-	err := db.Preload("User", func(tx *gorm.DB) *gorm.DB {
+	err := c.db.Preload("User", func(tx *gorm.DB) *gorm.DB {
 		return tx.Select("ID", "email", "username", "created_at", "updated_at")
 	}).Preload("Photo", func(tx *gorm.DB) *gorm.DB {
 		return tx.Select("ID", "title", "caption", "photo_url", "user_id", "created_at", "updated_at")
-	}).Where("user_id = ?", uint(userDataId)).Find(&comments).Error
+	}).Where("user_id = ?", userDataID).Find(&comments).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -75,15 +82,16 @@ func GetAllComments(ctx *gin.Context) {
 		})
 		return
 	}
+
 	ctx.JSON(http.StatusCreated, gin.H{
 		"status": http.StatusCreated,
 		"data":   comments,
 	})
 }
 
-func UpdateComment(ctx *gin.Context) {
-	db := database.GetDB()
+func (c *CommentController) UpdateComment(ctx *gin.Context) {
 	comment := models.Comment{}
+
 	contentType := helpers.GetContentType(ctx)
 	if contentType == "application/json" {
 		ctx.ShouldBindJSON(&comment)
@@ -96,7 +104,7 @@ func UpdateComment(ctx *gin.Context) {
 	comment.Updated_at = time.Now()
 
 	fmt.Printf("Value Update: %+v\n", comment)
-	err := db.Model(&comment).Where("id = ?", comment.ID).Updates(&comment).Error
+	err := c.db.Model(&comment).Where("id = ?", comment.ID).Updates(&comment).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -107,8 +115,9 @@ func UpdateComment(ctx *gin.Context) {
 		})
 		return
 	}
+
 	updatedComment := models.Comment{}
-	_ = db.First(&updatedComment, "id = ?", comment.ID).Error
+	_ = c.db.First(&updatedComment, "id = ?", comment.ID).Error
 
 	ctx.JSON(http.StatusCreated, gin.H{
 		"status": http.StatusOK,
@@ -116,16 +125,15 @@ func UpdateComment(ctx *gin.Context) {
 	})
 }
 
-func DeleteComment(ctx *gin.Context) {
-	db := database.GetDB()
+func (c *CommentController) DeleteComment(ctx *gin.Context) {
 	comment := models.Comment{}
+
 	temp, _ := strconv.Atoi(ctx.Param("commentId"))
-
 	comment.ID = uint(temp)
-	fmt.Println("cooment id", comment.ID)
 
-	err := db.Where("ID= ?", comment.ID).Delete(&comment).Error
+	fmt.Println("comment id:", comment.ID)
 
+	err := c.db.Where("ID= ?", comment.ID).Delete(&comment).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,

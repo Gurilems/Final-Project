@@ -8,13 +8,13 @@ import (
 )
 
 func main() {
-	database.StartDB()
+	db := database.GetDB()
 	router := gin.Default()
 
 	routers.UserRouter(router)
-	routers.PhotoRouter(router)
-	// routers.CommentRouter(router)
-	routers.SocialMediaRouter(router)
+	routers.PhotoRouter(router, db)
+	routers.CommentRouter(router, db)
+	routers.SocialMediaRouter(router, db)
 
-	router.Run(":8080")
+	router.Run(":5432")
 }

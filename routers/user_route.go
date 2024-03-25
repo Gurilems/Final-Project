@@ -8,11 +8,12 @@ import (
 )
 
 func UserRouter(route *gin.Engine) {
+	UserController := &controllers.UserController{}
 	user := route.Group("/users")
-	user.POST("/register", controllers.CreateUser)
-	user.POST("/login", controllers.UserLogin)
+	user.POST("/register", UserController.CreateUser)
+	user.POST("/login", UserController.UserLogin)
 
 	user.Use(middlewares.Authentication())
-	user.DELETE("/", controllers.DeleteUser)
-	user.PUT("/:userId", middlewares.UserAuthorization(), controllers.UpdateUser)
+	user.DELETE("/", UserController.DeleteUser)
+	user.PUT("/:userId", middlewares.UserAuthorization(), UserController.UpdateUser)
 }

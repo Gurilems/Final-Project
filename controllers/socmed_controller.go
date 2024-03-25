@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"final-project/database"
-	"final-project/helpers"
 	"final-project/models"
 	"fmt"
 	"net/http"
@@ -14,24 +12,29 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreateSocialMedia(ctx *gin.Context) {
-	db := database.GetDB()
+type SocialMediaController struct {
+	db *gorm.DB
+}
+
+func NewSocialMediaController(db *gorm.DB) *SocialMediaController {
+	return &SocialMediaController{db: db}
+}
+
+func (smc *SocialMediaController) CreateSocialMedia(ctx *gin.Context) {
 	sosmed := models.SocialMedia{}
-	contentType := helpers.GetContentType(ctx)
-	if contentType == "application/json" {
-		ctx.ShouldBindJSON(&sosmed)
-	} else {
-		ctx.ShouldBind(&sosmed)
+	if err := ctx.ShouldBindJSON(&sosmed); err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, err)
+		return
 	}
 
 	userData := ctx.MustGet("userData").(jwt.MapClaims)
-	userDataId := userData["id"].(float64)
+	userDataId := uint(userData["id"].(float64))
 
 	sosmed.Created_at = time.Now()
 	sosmed.Updated_at = time.Now()
-	sosmed.UserID = uint(userDataId)
+	sosmed.UserID = userDataId
 
-	err := db.Create(&sosmed).Error
+	err := smc.db.Create(&sosmed).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -55,14 +58,13 @@ func CreateSocialMedia(ctx *gin.Context) {
 	})
 }
 
-func GetAllSocialMedia(ctx *gin.Context) {
-	db := database.GetDB()
+func (smc *SocialMediaController) GetAllSocialMedia(ctx *gin.Context) {
 	userData := ctx.MustGet("userData").(jwt.MapClaims)
-	userDataId := userData["id"].(float64)
+	userDataId := uint(userData["id"].(float64))
 	socialMedias := []models.SocialMedia{}
-	err := db.Preload("User", func(tx *gorm.DB) *gorm.DB {
+	err := smc.db.Preload("User", func(tx *gorm.DB) *gorm.DB {
 		return tx.Select("ID", "username", "created_at", "updated_at")
-	}).Where("user_id = ?", uint(userDataId)).Find(&socialMedias).Error
+	}).Where("user_id = ?", userDataId).Find(&socialMedias).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -79,14 +81,11 @@ func GetAllSocialMedia(ctx *gin.Context) {
 	})
 }
 
-func UpdateSocialMedia(ctx *gin.Context) {
-	db := database.GetDB()
+func (smc *SocialMediaController) UpdateSocialMedia(ctx *gin.Context) {
 	socialMedia := models.SocialMedia{}
-	contentType := helpers.GetContentType(ctx)
-	if contentType == "application/json" {
-		ctx.ShouldBindJSON(&socialMedia)
-	} else {
-		ctx.ShouldBind(&socialMedia)
+	if err := ctx.ShouldBindJSON(&socialMedia); err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, err)
+		return
 	}
 
 	temp, _ := strconv.Atoi(ctx.Param("socialMediaId"))
@@ -94,7 +93,7 @@ func UpdateSocialMedia(ctx *gin.Context) {
 	socialMedia.Updated_at = time.Now()
 
 	fmt.Printf("Value Update: %+v\n", socialMedia)
-	err := db.Model(&socialMedia).Where("id = ?", socialMedia.ID).Updates(&socialMedia).Error
+	err := smc.db.Model(&socialMedia).Where("id = ?", socialMedia.ID).Updates(&socialMedia).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -107,9 +106,9 @@ func UpdateSocialMedia(ctx *gin.Context) {
 	}
 
 	updatedSosmed := models.SocialMedia{}
-	_ = db.First(&updatedSosmed, "id = ?", socialMedia.ID).Error
+	_ = smc.db.First(&updatedSosmed, "id = ?", socialMedia.ID).Error
 
-	ctx.JSON(http.StatusCreated, gin.H{
+	ctx.JSON(http.StatusOK, gin.H{
 		"status": http.StatusOK,
 		"data": gin.H{
 			"id":               updatedSosmed.ID,
@@ -121,14 +120,12 @@ func UpdateSocialMedia(ctx *gin.Context) {
 	})
 }
 
-func DeleteSocialMedia(ctx *gin.Context) {
-	db := database.GetDB()
+func (smc *SocialMediaController) DeleteSocialMedia(ctx *gin.Context) {
 	sosmed := models.SocialMedia{}
 	temp, _ := strconv.Atoi(ctx.Param("socialMediaId"))
 	sosmed.ID = uint(temp)
 
-	err := db.Where("ID= ?", sosmed.ID).Delete(&sosmed).Error
-
+	err := smc.db.Where("ID= ?", sosmed.ID).Delete(&sosmed).Error
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status": http.StatusInternalServerError,
@@ -140,7 +137,7 @@ func DeleteSocialMedia(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, gin.H{
+	ctx.JSON(http.StatusOK, gin.H{
 		"status": http.StatusOK,
 		"data": gin.H{
 			"message": "Your Social Media Has been Successfully Deleted",
